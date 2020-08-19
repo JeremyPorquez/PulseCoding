@@ -66,7 +66,9 @@ if __name__ == "__main__":
     s, s_inv = generateSimplex(n)
 
     # generate the test data parameters
-    number_of_combinations = (2 ** n) - 1
+    number_of_averages = 1
+    number_of_bits = (2 ** n) - 1
+    print(f"Number of bits: {number_of_bits}")
     data_points = 500
     pulse_width = 1
     amplitude = 3
@@ -74,29 +76,43 @@ if __name__ == "__main__":
     start_time = 0
 
     # simulate pulse
-    bit_separation = (max_time - start_time) / number_of_combinations
+    bit_separation = (max_time - start_time) / number_of_bits
     pulse_locations = bit_separation * np.arange(s.shape[1])
 
     # initialize the test data
     test_data = np.zeros((s.shape[0], data_points))
     time_axis = np.linspace(start_time, max_time, data_points)
 
-    for _n in range(number_of_combinations):
+    for _n in range(number_of_bits):
         for bit_index, bit in enumerate(s[_n]):
-            for idx, t in enumerate(time_axis):
-                test_data[_n][idx] += (amplitude * bit) * np.exp((-(t - pulse_locations[bit_index]) ** 2) / ((2 * pulse_width) ** 2)) + np.random.random()
-
+            for a in range(number_of_averages):
+                for idx, t in enumerate(time_axis):
+                    test_data[_n][idx] += (amplitude * bit) * np.exp((-(t - pulse_locations[bit_index]) ** 2) / ((2 * pulse_width) ** 2)) + np.random.random()
+    test_data /= number_of_averages
 
     fig = plt.figure()
 
-    ax1 = fig.add_subplot(211)
-    for _n in range(number_of_combinations):
+    ax1 = fig.add_subplot(311)
+    ax1.set_title(f'Pulse coding raw data. Bit length {number_of_bits}')
+    for _n in range(number_of_bits):
         ax1.plot(time_axis, test_data[_n] + _n*amplitude)
 
-    ax2 = fig.add_subplot(212)
+    ax2 = fig.add_subplot(312)
+    ax2.set_title(f"Pulse coding reconstructed")
     reconstructed = reconstructBGS(test_data, s_inv, index=0)
+    ax2.set_ylim(0, amplitude * 1.5)
     ax2.plot(time_axis, reconstructed[0])
 
-    print(f"SNR : {np.mean(reconstructed[0])/np.std(reconstructed[0])}")
+    ax3 = fig.add_subplot(313)
+    ax3.set_title(f'Averaging {number_of_averages * number_of_bits} times')
+    averaged = np.zeros((number_of_averages * number_of_bits, data_points))
+    for i in range(0, number_of_averages * number_of_bits):
+        averaged[i] = amplitude * np.exp((-(time_axis - 0) ** 2) / ((2 * pulse_width) ** 2)) + np.random.random(np.zeros((data_points)).shape)
+    # averaged /= number_of_averages * number_of_bits
+    ax3.set_ylim(0, amplitude * 1.5)
+    ax3.plot(time_axis, np.sum(averaged,axis=0)/averaged.shape[0])
 
+    print(f"SNR 1 meaurement: {np.mean(averaged[0]) / np.std(averaged[0])}")
+    print(f"SNR Pulse coding: {np.mean(reconstructed[0])/np.std(reconstructed[0])}")
+    print(f"SNR Averaging: {np.mean(averaged) / np.std(averaged)}")
     plt.show()
